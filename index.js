@@ -19,3 +19,9 @@ hooks.beforeCompile.callAsync({
     console.log('====beforeCompile====')
 }))
 
+
+function fn() {
+
+}
+
+fn()
