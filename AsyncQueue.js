@@ -208,3 +208,18 @@ function _processModuleDependencies(item, callback) {
 
 
 // webpack 中的异步任务调度执行
+
+class AsyncQueue2 {
+  constructor({ parallelism, processor }) {
+    this.parallelism = parallelism || 1
+    this.processor = processor
+  }
+}
+
+const addModuleQueue = new AsyncQueue2({
+  name: 'addModule',
+  processor: function _addModule(error, result) {
+    console.log(error, result)
+  }
+})
+
