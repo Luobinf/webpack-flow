@@ -207,19 +207,128 @@ function _processModuleDependencies(item, callback) {
 }
 
 
+
+
+
+
 // webpack 中的异步任务调度执行
 
+
+const IN_QUEUE = 0
+const PROCESSING = 1
+const DONE = 2
+
+class AsyncQueueEntry2 {
+  constructor(item,callback) {
+    this.item = item;
+    this.callback = callback;
+    this.state = IN_QUEUE
+  }
+}
+
+class ArrayQueue2 {
+  constructor() {
+    this.queue = []
+  }
+  enqueue(item) {
+    this.queue.push(item)
+  }
+  dequeue() {
+    return this.queue.shift()
+  }
+}
+
+
 class AsyncQueue2 {
-  constructor({ parallelism, processor }) {
-    this.parallelism = parallelism || 1
-    this.processor = processor
+  constructor({ name, parallelism, processor, getKey }) {
+    this._name = name
+    this._parallelism = parallelism || 1
+    // 当前任务索引
+    this._activeTasks = 0
+    this._processor = processor
+    this._getKey = getKey || ( item => item )
+    // 保存带执行的任务到队列中
+    this._queue = new ArrayQueue2()
+    this._needProcessing = false
+    this._willEnsureProcessing = false
+    this._ensureProcessing = this._ensureProcessing.bind(this)
+  }
+
+  add(item, callback) {
+
+    const newEntry = new AsyncQueueEntry2(item, callback)
+    this._queue.enqueue(newEntry)
+    this._needProcessing = true
+    if(this._willEnsureProcessing === false) {
+      this._willEnsureProcessing = true
+      setImmediate(this._ensureProcessing)
+    }
+  }
+
+  _ensureProcessing() {
+    while(this._activeTasks < this.parallelism) {
+      const entry = this._queue.dequeue()
+      if(entry === undefined) break
+      this._activeTasks++
+      entry.state = PROCESSING
+      this._startProcess(entry)
+    }
+
+  }
+
+  _startProcess(entry) {
+    try {
+      this._processor(entry.item, (e, r) => {
+        this._handleResult(entry, e, r)
+      })
+    } catch (e) {
+      this._handleResult(entry, e, null)
+    }
+  }
+
+  _handleResult(entry, err, result) {
+    const callback = entry.callback
+    entry.state = DONE
+    entry.callback = undefined
+    entry.error = err
+
+    this._activeTasks--
+    
   }
 }
 
 const addModuleQueue = new AsyncQueue2({
   name: 'addModule',
-  processor: function _addModule(error, result) {
-    console.log(error, result)
+  processor: function _addModule(item, callback) {  // 调度任务的处理方法
+    callback(null, item)
   }
 })
+
+
+// 每一个任务进入调度器之后，都要经过调度器的处理器函数处理之后得到结果。
+
+// xx.add(item, callback)
+
+// Task1 
+addModuleQueue.add({
+  key: 1,
+  name: 'Task1',
+}, (err, result) => {
+  console.log("Task1", err, result);
+})
+
+// Task2
+addModuleQueue.add({
+  key: 1,
+  name: 'Task2',
+}, (err, result) => {
+  console.log("Task2", err, result);
+})
+
+// 当前任务状态？队列中、处理中、处理完毕
+
+
+
+
+
 
